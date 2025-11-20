@@ -1,83 +1,77 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package com.mycompany.chatbot;
 
-
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
-
-/**
- *
- * @author sujit
- */
-
-
+import java.net.URI;
 
 public class chatbotUrl {
-private String key="AIzaSyCwwtOpu8nSK9Z9BV3TkjYDHDCKLoFDeD0";
-    public String chatbotUrl1(String s) {
-      try{
-          URL u=new URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent");
-          HttpURLConnection ucc=(HttpURLConnection)u.openConnection();
-          ucc.setRequestMethod("POST");
-          ucc.setRequestProperty("Content-type","application/json" );
-          ucc.setRequestProperty("X-goog-api-key",key );
+    private String key = "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";
+
+    public String chatbotStream(String userMessage, JTextArea area) {
+        String test="";
+        try {
+            URI u = URI.create("https://openrouter.ai/api/v1/chat/completions");
+            HttpURLConnection ucc = (HttpURLConnection) u.toURL().openConnection();
+            ucc.setRequestMethod("POST");
+            ucc.setRequestProperty("Content-Type", "application/json");
+            ucc.setRequestProperty("Authorization", "Bearer " + key);
+            ucc.setRequestProperty("HTTP-Referer", "http://localhost");
+            ucc.setRequestProperty("X-Title", "Java Chatbot");
             ucc.setDoOutput(true);
 
-            // 🧠 Request body
-            String userMessage = s;
-            String jsonInput = "{\n" +
-                    "  \"contents\": [\n" +
-                    "    {\n" +
-                    "      \"parts\": [\n" +
-                    "        { \"text\": \"" + userMessage + "\" }\n" +
-                    "      ]\n" +
-                    "    }\n" +
-                    "  ]\n" +
-                    "}";
-            OutputStream os=ucc.getOutputStream();
-            os.write(jsonInput.getBytes());
-            os.flush();
-            os.close();
-            BufferedReader br=new BufferedReader(new InputStreamReader(ucc.getInputStream()));
-            String sui;
-            StringBuffer brr=new StringBuffer();
+            // ✅ Request with streaming enabled
+            String jsonInputString = "{"
+                    + "\"model\": \"deepseek/deepseek-chat\","
+                    + "\"stream\": true,"
+                    + "\"messages\": [{\"role\": \"user\", \"content\": \"" +userMessage + "\"}]"
+                    + "}";
+
+            try (OutputStream os = ucc.getOutputStream()) {
+                os.write(jsonInputString.getBytes("UTF-8"));
+            }
             
-            while((sui=br.readLine())!=null){
-                brr.append(sui);
-                 
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(ucc.getInputStream(), "UTF-8"));
+            String line;
+
+            while ((line = br.readLine()) != null) {
+                if (line.startsWith("data: ")) {
+                    String json = line.substring(6).trim();
+                    if (json.equals("[DONE]")) break;
+
+                    try {
+                        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+                        JsonArray choices = obj.getAsJsonArray("choices");
+                        if (choices != null && choices.size() > 0) {
+                            JsonObject delta = choices.get(0).getAsJsonObject().getAsJsonObject("delta");
+                            if (delta != null && delta.has("content")) {
+                                String chunk = delta.get("content").getAsString();
+                                test=chunk;
+                                
+
+                                SwingUtilities.invokeLater(() -> area.append(chunk));
+                                
+                            }
+                        }
+                        
+                    } catch (Exception ex) {
+                        System.out.println("Skipping malformed: " + line);
+                    }
+                }
             }
             br.close();
-          JsonElement ele=JsonParser.parseString(brr.toString());
-          JsonObject obj=ele.getAsJsonObject();
-          JsonArray arr=obj.getAsJsonArray("candidates");
-          if (arr != null && arr.size() > 0) {
-    JsonObject content = arr.get(0).getAsJsonObject()
-                                   .getAsJsonObject("content");
 
-    JsonArray parts = content.getAsJsonArray("parts");
-    if (parts != null && parts.size() > 0) {
-        String reply = parts.get(0).getAsJsonObject().get("text").getAsString();
-        return reply;
+        } catch (Exception e) {
+            e.printStackTrace();
+            SwingUtilities.invokeLater(() -> area.append("\n⚠️ Error: " + e.getMessage()));
+        }
+        return test;
     }
-}
-return "No reply found.";
-           
-          
-      }
-      catch(Exception e){
-          return "Can't give responce.";
-          
-      }
-  }
-      
 }
